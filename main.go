@@ -38,7 +38,7 @@ func main() {
 
 	statement.Exec()
 
-	addUser(db, 190861, "Demo User")
+	addUser(db, 190862, "Demos User")
 
 	// deleteUser(db, 2)  // Can be used to delete a user from the database with a ID
 
