@@ -172,7 +172,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 func IsAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header["Token"] != nil {
-			fmt.Println(r.Header["Token"][0])
+			// fmt.Println(r.Header["Token"][0])
 			token, err := jwt.Parse(r.Header["Token"][0], func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					w.WriteHeader(http.StatusUnauthorized)
@@ -215,21 +215,28 @@ func IsAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handle
 			})
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-					response := models.Response {
-						Message: err.Error(),
-					} 
-					json.NewEncoder(w).Encode(response)
+				response := models.Response {
+					Message: err.Error(),
+				} 
+				json.NewEncoder(w).Encode(response)
 			}
 			
 			if token.Valid {
 				endpoint(w, r)
 			}
 		} else {
-			fmt.Fprintf(w, "No Authorization Token provided")
+			w.WriteHeader(http.StatusInternalServerError)
+			response := models.Response {
+				Message: "No Authorization Token provided!",
+			} 
+			json.NewEncoder(w).Encode(response)
 		}
 	})
 }
 
 func SecretPage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, `{"response": "Secret Info for User!"}`)
+	response := models.Response {
+		Message: "Secret Info for User!",
+	} 
+	json.NewEncoder(w).Encode(response)
 }
