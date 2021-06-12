@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"iitk-coin/controllers"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"iitk-coin/database"
 
 	"github.com/dgrijalva/jwt-go"
 	_ "github.com/mattn/go-sqlite3"
@@ -317,18 +320,8 @@ func secretPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	db, _ := sql.Open("sqlite3", "db/users.db")
-	fmt.Println(db)
-	a.DB = db
-	statement, _ := db.Prepare("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY,username TEXT, name TEXT, rollno INTEGER, password TEXT)")
 
-	statement.Exec()
-
-	// addUser(db, "username", "name", 190860, "hash")
-
-	// deleteUser(db, 2)  // Can be used to delete a user from the database with a ID
-
-	rows, _ := a.DB.Query("SELECT id, username, name, rollno, password FROM user")
+	rows, _ := database.InitalizeDatabase().Query("SELECT id, username, name, rollno, password FROM user")
 
 	var id int
 	var username string
@@ -344,9 +337,9 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/signup", signup)
-	mux.HandleFunc("/login", login)
-	mux.Handle("/secretPage", isAuthorized(secretPage))
+	mux.HandleFunc("/signup", controllers.Signup)
+	mux.HandleFunc("/login", controllers.Login)
+	mux.Handle("/secretPage", controllers.IsAuthorized(controllers.SecretPage))
 
 	http.ListenAndServe(":8080", mux)
 }
