@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"iitk-coin/database"
 
@@ -15,16 +17,21 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+var lock sync.Mutex
+
+
 func Signup(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	w.Header().Set("Content-Type", "application/json") 
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-			panic(err)
+		panic(err)
 	}
 	var user models.User
 	json.Unmarshal([]byte(string(body)), &user)
+
+	user.Coins = 10
 
 	if (user.Username == "" || user.Password == "" || user.Name == "") {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -57,7 +64,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
     }
 
 	hash := models.HashAndSalt([]byte(user.Password))
-	status := models.AddUser(database.InitalizeDatabase(), user.Username, user.Name, user.Rollno, hash)
+	status := models.AddUser(database.InitalizeDatabase(), user.Username, user.Name, user.Rollno, hash, user.Coins)
 
 	if status {
 		response := models.Response {
@@ -239,4 +246,183 @@ func SecretPage(w http.ResponseWriter, r *http.Request) {
 		Message: "Secret Info for User!",
 	} 
 	json.NewEncoder(w).Encode(response)
+}
+
+func GiveCoins(w http.ResponseWriter, r *http.Request) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	time.Sleep(1 * time.Second)
+
+	r.ParseForm()
+	w.Header().Set("Content-Type", "application/json") 
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	var user models.UpdateCoins
+	json.Unmarshal([]byte(string(body)), &user)
+
+	currentCoins := models.GetCoins(database.InitalizeDatabase(), user.Rollno)
+	userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
+	
+	if userId == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "No such user present!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
+	status := models.UpdateUser(database.InitalizeDatabase(), userId, user.Rollno, user.Coins+currentCoins)
+
+	if status {
+		response := models.Response {
+			Message: "Coins given Successfully!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Error in giving coins, please try again!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+	}
+}	
+
+func TransferCoins(w http.ResponseWriter, r *http.Request) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	time.Sleep(1 * time.Second)
+
+	r.ParseForm()
+	w.Header().Set("Content-Type", "application/json") 
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	var user models.TransferCoins
+	json.Unmarshal([]byte(string(body)), &user)
+
+	senderUser := models.GetUserId(database.InitalizeDatabase(), user.SenderRollno)
+	receiverUser := models.GetUserId(database.InitalizeDatabase(), user.ReceiverRollno)
+
+	if senderUser == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "No such sending user present!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
+	if receiverUser == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "No such receiving user present!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
+	senderCoins := models.GetCoins(database.InitalizeDatabase(), user.SenderRollno)
+	receiverCoins := models.GetCoins(database.InitalizeDatabase(), user.ReceiverRollno)
+
+	if senderCoins >= user.Coins {
+		status1 := models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, senderCoins-user.Coins)
+		status2 := models.UpdateUser(database.InitalizeDatabase(), receiverUser, user.ReceiverRollno, receiverCoins+user.Coins)
+
+		if status1 && status2 {
+			response := models.Response {
+				Message: "Coins Transferred Successfully!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+	
+			return
+		} else {
+			if status1 && !status2 {
+				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, senderCoins+user.Coins)
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "Error in transferring coins, please try again!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+		
+				return
+			} else if !status1 && status2 {
+				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, receiverCoins-user.Coins)
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "Error in transferring coins, please try again!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+		
+				return
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "Error in transferring coins, please try again!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+		
+				return
+			}
+		}
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+		response := models.Response {
+			Message: "Insufficient Balance, to transfer!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
+}
+
+func Balance(w http.ResponseWriter, r *http.Request) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	time.Sleep(time.Millisecond)
+
+	r.ParseForm()
+	w.Header().Set("Content-Type", "application/json") 
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	var user models.RetrieveBalance
+	json.Unmarshal([]byte(string(body)), &user)
+
+	userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
+
+	if userId == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "No such user present!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
+	response := models.RetrieveBalance {
+		Rollno: user.Rollno,
+		Coins: models.GetCoins(database.InitalizeDatabase(), user.Rollno),
+	} 
+	json.NewEncoder(w).Encode(response)
+
+	return
 }
