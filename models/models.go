@@ -81,7 +81,6 @@ func UpdateUser(db *sql.DB, id int, rollno int, coins int) bool {
 }
 
 func GetCoins(db *sql.DB, rollno int) int {
-	
 	query := db.QueryRow("select coins from user where rollno=$1", rollno)
 	var coins int
 	query.Scan(&coins)

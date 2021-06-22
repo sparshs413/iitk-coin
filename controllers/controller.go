@@ -19,7 +19,6 @@ import (
 
 var lock sync.Mutex
 
-
 func Signup(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	w.Header().Set("Content-Type", "application/json") 
@@ -386,7 +385,6 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-
 }
 
 func Balance(w http.ResponseWriter, r *http.Request) {
@@ -423,6 +421,4 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 		Coins: models.GetCoins(database.InitalizeDatabase(), user.Rollno),
 	} 
 	json.NewEncoder(w).Encode(response)
-
-	return
 }
