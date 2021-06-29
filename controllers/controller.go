@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iitk-coin/models"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -30,7 +31,13 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	json.Unmarshal([]byte(string(body)), &user)
 
-	user.Coins = 10
+	user.Coins = 0
+	user.PermissionsLevel = 0
+	user.CompetitionsParticipated = 0
+	if user.Rollno == 999999 {
+		user.PermissionsLevel = 2
+	}
+	
 
 	if (user.Username == "" || user.Password == "" || user.Name == "") {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -63,7 +70,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
     }
 
 	hash := models.HashAndSalt([]byte(user.Password))
-	status := models.AddUser(database.InitalizeDatabase(), user.Username, user.Name, user.Rollno, hash, user.Coins)
+	status := models.AddUser(database.InitalizeDatabase(), user.Username, user.Name, user.Rollno, hash, user.Coins, user.PermissionsLevel, user.CompetitionsParticipated)
 
 	if status {
 		response := models.Response {
@@ -264,31 +271,56 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 	var user models.UpdateCoins
 	json.Unmarshal([]byte(string(body)), &user)
 
-	currentCoins := models.GetCoins(database.InitalizeDatabase(), user.Rollno)
-	userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
-	
-	if userId == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "No such user present!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
+	claims, status1 := models.ExtractClaims(r.Header["Token"][0])
 
-		return
-	}
+	if status1 {
+		permission := models.GetUserPermission(database.InitalizeDatabase(), int(claims["rollno"].(float64)))
 
-	status := models.UpdateUser(database.InitalizeDatabase(), userId, user.Rollno, user.Coins+currentCoins)
+		if permission == 2 {
+			userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
+			
+			if userId == 0 {
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "No such user present!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+		
+				return
+			}
 
-	if status {
-		response := models.Response {
-			Message: "Coins given Successfully!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
+			currentCoins := models.GetCoins(database.InitalizeDatabase(), user.Rollno)
+			numCompetiton := models.GetNumCompetiton(database.InitalizeDatabase(), user.Rollno)		
+
+			status := models.UpdateUser(database.InitalizeDatabase(), userId, user.Rollno, user.Coins+currentCoins)
+			numCompetiton = numCompetiton + 1
+			status2 := models.UpdateNumCompetitions(database.InitalizeDatabase(), userId, user.Rollno, numCompetiton)
+			status3 := models.AddTransaction(database.InitalizeTransactionHistoryDatabase(), "add", user.Rollno, int(claims["rollno"].(float64)), user.Coins, time.Now().String())
+		
+			if status && status2 && status3 {
+				response := models.Response {
+					Message: "Coins given Successfully!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "Error in giving coins, please try again!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+			}
+		} else {
+			w.WriteHeader(http.StatusUnauthorized)
+			response := models.Response {
+				Message: "You are not authorized to give Coins!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+		}
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
-			Message: "Error in giving coins, please try again!",
-	    } 
+			Message: "Please re-login and try again!",
+		} 
 		json.NewEncoder(w).Encode(response) 
 	}
 }	
@@ -333,14 +365,36 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	numCompetiton := models.GetNumCompetiton(database.InitalizeDatabase(), user.ReceiverRollno)	
+	if numCompetiton == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "User not eligible for getting coins!",
+	    } 
+		json.NewEncoder(w).Encode(response) 
+
+		return
+	}
+
 	senderCoins := models.GetCoins(database.InitalizeDatabase(), user.SenderRollno)
 	receiverCoins := models.GetCoins(database.InitalizeDatabase(), user.ReceiverRollno)
 
 	if senderCoins >= user.Coins {
+		var coins float64 = float64(user.Coins)
+		diff := user.SenderRollno/10000 - user.ReceiverRollno/10000
+
+		if math.Abs(float64(diff)) > 0 {
+			coins = (coins*2)/3
+		} else if math.Abs(float64(diff)) == 0 {
+			coins = (coins*49)/50
+		}
+
 		status1 := models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, senderCoins-user.Coins)
-		status2 := models.UpdateUser(database.InitalizeDatabase(), receiverUser, user.ReceiverRollno, receiverCoins+user.Coins)
+		status2 := models.UpdateUser(database.InitalizeDatabase(), receiverUser, user.ReceiverRollno, receiverCoins+int(coins))
 
 		if status1 && status2 {
+			models.AddTransaction(database.InitalizeTransactionHistoryDatabase(), "transfer", user.ReceiverRollno, user.SenderRollno, user.Coins, time.Now().String())
+				
 			response := models.Response {
 				Message: "Coins Transferred Successfully!",
 			} 
@@ -358,7 +412,7 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 		
 				return
 			} else if !status1 && status2 {
-				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, receiverCoins-user.Coins)
+				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, receiverCoins-int(coins))
 				w.WriteHeader(http.StatusInternalServerError)
 				response := models.Response {
 					Message: "Error in transferring coins, please try again!",
