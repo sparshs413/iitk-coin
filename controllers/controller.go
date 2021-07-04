@@ -28,6 +28,14 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+	if models.IsJSON(string(body)) == false {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
 	var user models.User
 	json.Unmarshal([]byte(string(body)), &user)
 
@@ -92,6 +100,15 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		panic(err)
+	}
+
+	if models.IsJSON(string(body)) == false {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
 	}
 
 	var user models.LoginCred
@@ -268,6 +285,15 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	if models.IsJSON(string(body)) == false {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
 	var user models.UpdateCoins
 	json.Unmarshal([]byte(string(body)), &user)
 
@@ -342,6 +368,36 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 	var user models.TransferCoins
 	json.Unmarshal([]byte(string(body)), &user)
 
+	if models.IsJSON(string(body)) == false {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
+	claims, status1 := models.ExtractClaims(r.Header["Token"][0])
+
+	if status1 {
+		if int(claims["rollno"].(float64)) != user.SenderRollno {
+			w.WriteHeader(http.StatusUnauthorized)
+			response := models.Response {
+				Message: "Please login from your own account!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Please try again!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
 	senderUser := models.GetUserId(database.InitalizeDatabase(), user.SenderRollno)
 	receiverUser := models.GetUserId(database.InitalizeDatabase(), user.ReceiverRollno)
 
@@ -366,6 +422,7 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	numCompetiton := models.GetNumCompetiton(database.InitalizeDatabase(), user.ReceiverRollno)	
+
 	if numCompetiton == 0 {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
@@ -453,6 +510,15 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		panic(err)
+	}
+
+	if models.IsJSON(string(body)) == false {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
 	}
 
 	var user models.RetrieveBalance
