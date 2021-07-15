@@ -28,7 +28,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	if models.IsJSON(string(body)) == false {
+	if !models.IsJSON(string(body)) {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
 			Message: "Invalid Json!",
@@ -46,7 +46,6 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		user.PermissionsLevel = 2
 	}
 	
-
 	if (user.Username == "" || user.Password == "" || user.Name == "") {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
@@ -102,7 +101,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	if models.IsJSON(string(body)) == false {
+	if !models.IsJSON(string(body)) {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
 			Message: "Invalid Json!",
@@ -285,7 +284,7 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	if models.IsJSON(string(body)) == false {
+	if !models.IsJSON(string(body)) {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
 			Message: "Invalid Json!",
@@ -368,7 +367,7 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 	var user models.TransferCoins
 	json.Unmarshal([]byte(string(body)), &user)
 
-	if models.IsJSON(string(body)) == false {
+	if !models.IsJSON(string(body)) {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
 			Message: "Invalid Json!",
@@ -512,7 +511,7 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	if models.IsJSON(string(body)) == false {
+	if !models.IsJSON(string(body)) {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := models.Response {
 			Message: "Invalid Json!",
@@ -541,4 +540,254 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 		Coins: models.GetCoins(database.InitalizeDatabase(), user.Rollno),
 	} 
 	json.NewEncoder(w).Encode(response)
+}
+
+func Redeem(w http.ResponseWriter, r *http.Request){
+	body, err := ioutil.ReadAll(r.Body)
+
+	if err != nil {
+		panic(err)
+	}
+
+	if !models.IsJSON(string(body)) {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
+	var redeem models.RedeemReqCust
+	json.Unmarshal([]byte(string(body)), &redeem)
+
+	if err != nil {
+		models.CheckErr(err)
+		return
+	}
+
+	claims, status1 := models.ExtractClaims(r.Header["Token"][0])
+
+	if status1 {
+		if int(claims["rollno"].(float64)) != redeem.Rollno {
+			w.WriteHeader(http.StatusUnauthorized)
+			response := models.Response {
+				Message: "Please login from your own account!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Please try again!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
+	permission := models.GetUserPermission(database.InitalizeDatabase(), redeem.Rollno)
+
+	if permission == 0 {
+		currentBalance := models.GetCoins(database.InitalizeDatabase(), redeem.Rollno)
+
+		if currentBalance < redeem.Coins {
+			w.WriteHeader(http.StatusInternalServerError)
+			response := models.Response {
+				Message: "Insufficient Balance!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+
+			return
+		} else {
+			status := models.AddRedeemRequest(database.InitalizeDatabase(), redeem.ItemName, redeem.Rollno, redeem.Coins)
+
+			if status {
+				response := models.Response {
+					Message: "Request Initiated!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+				return
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+				response := models.Response {
+					Message: "Error in creating request, please try again!",
+				} 
+				json.NewEncoder(w).Encode(response) 
+				return
+			}
+		}		
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+		response := models.Response {
+			Message: "Admins' are not allowed to redeem coins!",
+		} 
+
+		json.NewEncoder(w).Encode(response) 
+		return
+	} 
+}
+
+func ApproveRequest(w http.ResponseWriter, r *http.Request) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	time.Sleep(1 * time.Second)
+
+	r.ParseForm()
+	w.Header().Set("Content-Type", "application/json") 
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	if !models.IsJSON(string(body)) {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Invalid Json!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+
+	var req models.AcceptReq
+	json.Unmarshal([]byte(string(body)), &req)
+
+	claims, status1 := models.ExtractClaims(r.Header["Token"][0])
+
+	if status1 {
+		permission := models.GetUserPermission(database.InitalizeDatabase(), int(claims["rollno"].(float64)))
+
+		if permission == 2 {
+			rollno, coins, status := models.GetReqData(database.InitalizeDatabase(), req.Id)
+
+			rollno1, err1 := strconv.Atoi(rollno)
+			coins1, err2 := strconv.Atoi(coins)
+			status1, err3 := strconv.Atoi(status)
+
+			if err1 == nil && err2 == nil && err3 == nil {
+				if status1 != 1 {
+					w.WriteHeader(http.StatusInternalServerError)
+					response := models.Response {
+						Message: "Request already responded!",
+					} 
+					json.NewEncoder(w).Encode(response) 
+					return
+				}
+
+				coins := models.GetCoins(database.InitalizeDatabase(), rollno1)
+				if coins < coins1 {
+					status := models.UpdateRequestStatus(database.InitalizeDatabase(), req.Id, 2)
+
+					if status {
+						response := models.Response {
+							Message: "Request rejected, because of insufficient balance!",
+						} 
+						json.NewEncoder(w).Encode(response) 
+						return
+					} else {
+						w.WriteHeader(http.StatusInternalServerError)
+						response := models.Response {
+							Message: "Please try again!",
+						} 
+						json.NewEncoder(w).Encode(response) 
+						return
+					}
+				} else {
+					userId := models.GetUserId(database.InitalizeDatabase(), rollno1)
+					status := models.UpdateUser(database.InitalizeDatabase(), userId, rollno1, coins-coins1)
+					if status {
+						status = models.UpdateRequestStatus(database.InitalizeDatabase(), req.Id, 0)
+						if status {
+							response := models.Response {
+								Message: "Request approved successfully!",
+							} 
+							json.NewEncoder(w).Encode(response) 
+							return
+						} else {
+							_ = models.UpdateUser(database.InitalizeDatabase(), userId, rollno1, coins+coins1)
+
+							w.WriteHeader(http.StatusInternalServerError)
+							response := models.Response {
+								Message: "Please try again!",
+							} 
+							json.NewEncoder(w).Encode(response) 
+							return
+						}
+					} else {
+						w.WriteHeader(http.StatusInternalServerError)
+						response := models.Response {
+							Message: "Please try again!",
+						} 
+						json.NewEncoder(w).Encode(response) 
+						return
+					}
+				}
+			}
+		} else {
+			w.WriteHeader(http.StatusUnauthorized)
+			response := models.Response {
+				Message: "You are not authorized to give Coins!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Please re-login and try again!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+}
+
+func ShowUnapprovedRequest(w http.ResponseWriter, r *http.Request) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	time.Sleep(1 * time.Second)
+
+	r.ParseForm()
+	w.Header().Set("Content-Type", "application/json") 
+
+	claims, status1 := models.ExtractClaims(r.Header["Token"][0])
+
+	if status1 {
+		permission := models.GetUserPermission(database.InitalizeDatabase(), int(claims["rollno"].(float64)))
+
+		if permission == 2 {
+			rows2, _ := database.InitalizeDatabase().Query("SELECT id, rollno, coins, itemName, status FROM redeem")
+
+			var id2 int
+			var rollno1 string
+			var coins1 string
+			var status string
+			var itemName string
+		
+			for rows2.Next() {
+				rows2.Scan(&id2, &rollno1, &coins1, &itemName, &status)
+				if status == "1" {
+					fmt.Println(strconv.Itoa(id2) + ": " + rollno1 + " " + coins1 + " " + itemName + " " + status)
+				}
+			}
+		} else {
+			w.WriteHeader(http.StatusUnauthorized)
+			response := models.Response {
+				Message: "You are not authorized to see pending requests!",
+			} 
+			json.NewEncoder(w).Encode(response) 
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := models.Response {
+			Message: "Please re-login and try again!",
+		} 
+		json.NewEncoder(w).Encode(response) 
+		return
+	}
+	
 }

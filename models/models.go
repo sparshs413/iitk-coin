@@ -1,10 +1,14 @@
 package models
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
+
+	gomail "gopkg.in/mail.v2"
 
 	"github.com/dgrijalva/jwt-go"
 	"golang.org/x/crypto/bcrypt"
@@ -49,6 +53,17 @@ type TransferCoins struct {
 	Coins int `json:"transferCoins"`
 }
 
+type RedeemReqCust struct { 
+	Id int `json:"id"`
+	Rollno int `json:"rollno"`
+	Coins int `json:"coins"`
+	ItemName string `json:"itemname"` 
+}
+
+type AcceptReq struct { 
+	Id int `json:"id"`
+}
+
 func CheckErr(err error) {
 	if err != nil {
 		panic(err)
@@ -72,6 +87,19 @@ func AddUser(db *sql.DB, username string, name string, rollno int, password stri
 	tx, _ := db.Begin()
 	stmt, _ := tx.Prepare("INSERT INTO user (username, name, rollno, password, coins, permissionLevel, competitionsParticipated) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	_, err := stmt.Exec(username, name, rollno, password, coins, permissionLevel, competitionsParticipated)
+	if err != nil {
+		CheckErr(err)
+		return false
+	}
+	tx.Commit()
+
+	return true
+}
+
+func AddRedeemRequest(db *sql.DB, name string, rollno int, coins int) bool {
+	tx, _ := db.Begin()
+	stmt, _ := tx.Prepare("INSERT INTO redeem (rollno, coins, itemName, status) VALUES (?, ?, ?, ?)")
+	_, err := stmt.Exec(rollno, coins, name, 1)
 	if err != nil {
 		CheckErr(err)
 		return false
@@ -129,6 +157,21 @@ func UpdateNumCompetitions(db *sql.DB, id int, rollno int, competitions int) boo
 	return true
 }
 
+func UpdateRequestStatus(db *sql.DB, id int, status int) bool {
+	sid := strconv.Itoa(id)
+	sstatus := strconv.Itoa(status)
+	tx, _ := db.Begin()
+	stmt, _ := tx.Prepare("update redeem set status=? where id=?")
+	_, err := stmt.Exec(sstatus, sid)
+	if err != nil {
+		CheckErr(err)
+		return false
+	}
+	tx.Commit()
+
+	return true
+}
+
 func GetCoins(db *sql.DB, rollno int) int {
 	query := db.QueryRow("select coins from user where rollno=$1", rollno)
 	var coins int
@@ -159,6 +202,18 @@ func GetNumCompetiton(db *sql.DB, rollno int) int {
 	query.Scan(&id)
 
 	return id
+}
+
+func GetReqData(db *sql.DB, id int) (string, string, string) {
+	query := db.QueryRow("select rollno, coins, itemName, status from redeem where id=$1", id)
+	var rollno string
+	var coins string
+	var status string
+	var itemName string
+
+	query.Scan(&rollno, &coins, &itemName, &status)
+
+	return rollno, coins, status
 }
 
 func HashAndSalt(pwd []byte) string {
@@ -203,4 +258,22 @@ func ExtractClaims(tokenStr string) (jwt.MapClaims, bool) {
 func IsJSON(s string) bool {
     var js map[string]interface{}
     return json.Unmarshal([]byte(s), &js) == nil
+}
+
+func SendOtp(rollno int) bool {
+	srollno := strconv.Itoa(rollno)
+	m := gomail.NewMessage()
+	m.SetHeader("From", "sparshs@iitk.ac.in")
+	m.SetHeader("To", srollno + "@iitk.ac.in")
+	m.SetHeader("Subject", "Gomail test subject")
+	m.SetBody("text/plain", "This is Gomail test body")
+	d := gomail.NewDialer("mmtp.iitk.ac.in", 25, "sparshs@iitk.ac.in", "Myr@ndOmPaSswOrD")
+	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+
+	if err := d.DialAndSend(m); err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+
+	return true
 }

@@ -8,6 +8,9 @@ func InitalizeDatabase() *sql.DB {
 	statement, _ := db.Prepare("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY,username TEXT, name TEXT, rollno INTEGER, password TEXT, coins INTEGER, permissionLevel INTEGER, competitionsParticipated INTEGER)")
 	statement.Exec()
 
+	statement1, _ := db.Prepare("CREATE TABLE IF NOT EXISTS redeem (id INTEGER PRIMARY KEY, rollno INTEGER, coins INTEGER, itemName TEXT, status INTEGER)")
+	statement1.Exec()
+
 	return db
 }
 
