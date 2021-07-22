@@ -69,7 +69,7 @@ func main() {
 	mux.Handle("/redeem", controllers.IsAuthorized(controllers.Redeem))
 	mux.Handle("/approveRequest", controllers.IsAuthorized(controllers.ApproveRequest))
 	mux.Handle("/showUnapprovedRequest", controllers.IsAuthorized(controllers.ShowUnapprovedRequest))
-	
 
 	http.ListenAndServe(":8080", mux)
 }
+
