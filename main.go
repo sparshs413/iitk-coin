@@ -2,6 +2,7 @@ package main
 
 import (
 	"iitk-coin/controllers"
+	"iitk-coin/database"
 	"log"
 	"net/http"
 
@@ -9,6 +10,9 @@ import (
 )
 
 func main() {
+	database.InitalizeDatabase()
+	database.InitalizeTransactionHistoryDatabase()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/signup", controllers.Signup)
