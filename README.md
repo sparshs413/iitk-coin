@@ -53,6 +53,8 @@ This repository contains the code for the IITKCoin, a vision of a pseudo-currenc
 
 ## Usage
 
+### Use this repo
+
 ```bash
 cd $GOPATH/src/github.com/<username>
 git clone https://github.com/gurbaaz27/iitk-coin.git
@@ -70,6 +72,12 @@ Output should look like
 2021/07/26 22:24:25 Wallet Database opened and table created (if not existed) successfully!
 2021/07/26 22:24:25 Transaction Database opened and table created (if not existed) successfully!
 2021/07/26 22:24:25 Starting server, Listening on http://localhost:8080
+```
+
+### Use Docker Image
+
+```
+docker run --rm -p 8080:8080 sparshs413/iitk-coin
 ```
 
 ## Endpoints
