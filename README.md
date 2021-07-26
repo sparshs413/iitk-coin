@@ -1,106 +1,121 @@
-# IITK-COIN
+# IITK Coin
 
-### Steps for running the code
+## SnT Project 2021, Programming Club
 
-Go to `$GOPATH/src/` and then
+This repository contains the code for the IITKCoin, a vision of a pseudo-currency for use in the IITK Campus.
+
+### Relevant Links
+
+-   [Midterm Evaluation presentation](https://docs.google.com/presentation/d/1kriN-7A3v1RlXUDL5NETX3roJKRMJInptkWofIxY8dg/edit?usp=sharing)
+-   [Midterm Documentation](https://docs.google.com/document/d/1bvOWH4k0U-l2pQ1jLWIDzOkJ2wbHNW4jJw7tMWkUV6o/edit?usp=sharing)
+
+## Table Of Content
+
+-   [Development Environment](#development-environment)
+-   [Directory Structure](#directory-structure)
+-   [Usage](#usage)
+-   [Endpoints](#endpoints)
+
+## Development Environment
+
+```bash
+- OS:           Ubuntu 20.04.2 LTS x86-64    # https://ubuntu.com/download
+- Kernel:       Linux 5.4.0-80-generic       # https://kernel.ubuntu.com/
+- go version:   go1.16.6 linux/amd64         # https://golang.org/dl/
+- text editor:  VSCode    	                  # https://code.visualstudio.com/download
+- terminal:     Zsh                          # https://ohmyz.sh/
 
 ```
-git clone https://github.com/sparshs413/iitk-coin.git
 
-cd iitk-coin
-```
-
-To run the app
+## Directory Structure
 
 ```
+.
+
+├── auth
+│   └── auth.go
+├── controllers
+│   └── controller.go
+├── database
+│   └── database.go
+├── db
+    ├── transactionHistory.db
+│   └── users.db
+├── go.mod
+├── go.sum
+├── main.go
+├── models
+│   └── models.go
+├── README.md
+
+5 directories, 10 files
+```
+
+## Usage
+
+```bash
+cd $GOPATH/src/github.com/<username>
+git clone https://github.com/gurbaaz27/iitk-coin.git
+cd repo
 go run main.go
+#, or build the program and run the executable
+go build
+./iitk-coin
 ```
 
-The app currently features 6 endpoints
-`/login`,
-`/signup`,
-`/secretPage`,
-`/giveCoins`,
-`/transferCoins` and
-`/balance`.
-
-The `/login`, `/signup`, `/giveCoins`, `/transferCoins` and `/balance` are public while the `/secretPage` is accessible only to the authorized users.
-
-To test them, follow the following steps:
-
-For, `/signup`
-
-Go to Postman and in the Body Parameter, send a JSON in the following format
+Output should look like
 
 ```
-{
-    "username":"demovalue",      // User's Username
-    "name":"Demo Value",         // User's Name
-    "rollno":190860              // User's Rollno
-    "password":"demopassword"    // User's Password
-}
+2021/07/26 22:24:25 User Database opened and table created (if not existed) successfully!
+2021/07/26 22:24:25 Wallet Database opened and table created (if not existed) successfully!
+2021/07/26 22:24:25 Transaction Database opened and table created (if not existed) successfully!
+2021/07/26 22:24:25 Starting server, Listening on http://localhost:8080
+```
+
+## Endpoints
+
+POST requests take place via `JSON` requests. A typical usage would look like
+
+```bash
+curl -d '<json-request>' -H 'Content-Type: application/json' http://localhost:8080/<endpoint>
+```
+
+-   `/signup` : `POST`
+
+```json
+{ "username": "<username>", "name": "<name>", "rollno": "<rollno>", "password": "<password>" }
 ```
 
 PS: Roll Nos, only valid in range of [170001, 210000).
 
-For, `/login`
+-   `/login` : `POST`
 
-Go to Postman and in the Body Parameter, send a JSON in the following format
-
-```
-{
-    "rollno":190860              // User's Rollno
-    "password":"demopassword"    // User's Password
-}
+```json
+{ "rollno": "<rollno>", "password": "<password>" }
 ```
 
-On successful login, a JWT token will be printed, on the Terminal.
+-   `/balance` : `POST`
 
-For accessing `/secretPage`,
-Use the previously generated token and send it in the form of a Header with `Key` as `Token` and with the previously generated JWT token.
-
-If the token is valid, you will get a JSON with a "Secret Message".
-
-For, `/balance`,
-this endpoint is used to get the balance of a particular user.
-
-Go to Postman and in the Body Parameter, send a JSON in the following format
-
-```
-{
-    "rollno": 190860     // User's Rollno
-}
+```json
+{ "rollno": "<rollno>" }
 ```
 
-If the user is present, we get the number of Coins held by the user.
+-   `/giveCoins` : `POST`
 
-For, `/giveCoins`,
-this endpoint is used to give coins to a particular user.
-
-Go to Postman and in the Body Parameter, send a JSON in the following format
-
-```
-{
-    "rollno": 190860,  // User's Rollno
-    "coins":10         // Amount of Coins to be given to user
-}
+```json
+{ "rollno": "<rollno>", "coins": "<coins>" }
 ```
 
-If the user is present, the coins for the user gets updated.
+-   `/transferCoins` : `POST`
 
-For, `/transferCoins`,
-this endpoint is used to transfer coins between users.
-
-Go to Postman and in the Body Parameter, send a JSON in the following format
-
-```
-{
-    "senderRollno": 190861,      // Sender's Rollno
-    "receiverRollno": 190860,    // Receiver's Rollno
-    "transferCoins": 23          // # coins to be transferred
-}
+```json
+{ "senderRollno": "<senderRollno>", "receiverRollno": "<receiverRollno>", "transferCoins": "<transferCoins>" }
 ```
 
-On successful transaction, the coins gets transferred.
+GET requests:
 
-#### For concurrency used `Mutex` in order to avoid conflicts and the steps run sequentially.
+-   `/secretpage` : `GET`
+
+```bash
+curl http://localhost:8080/secretPage
+```
