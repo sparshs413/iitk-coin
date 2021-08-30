@@ -28,12 +28,9 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON", w)
 		return
 	}
 	var user models.User
@@ -42,23 +39,16 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	user.Coins = 0
 	user.PermissionsLevel = 0
 	user.CompetitionsParticipated = 0
+
 	if user.Rollno == 999999 {
 		user.PermissionsLevel = 2
 	}
 	
 	if (user.Username == "" || user.Password == "" || user.Name == "") {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please enter all the fields!",
-	    } 
-		json.NewEncoder(w).Encode(response)
+		models.SendResponse(400, "Please enter all the fields!", w)
 		return 
 	} else if (user.Rollno<170000 || user.Rollno>210000){
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Roll number not authorized!",
-	    } 
-		json.NewEncoder(w).Encode(response)
+		models.SendResponse(403, "Roll number not authorized!", w)
 		return 
 	}
 
@@ -67,12 +57,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	studentCheck := query.Scan(&user.Username)
 	
 	if studentCheck == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		response := models.Response {
-			Message: "User already exists!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(409, "User already exists!", w)
 		return
     }
 
@@ -80,16 +65,9 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	status := models.AddUser(database.InitalizeDatabase(), user.Username, user.Name, user.Rollno, hash, user.Coins, user.PermissionsLevel, user.CompetitionsParticipated)
 
 	if status {
-		response := models.Response {
-			Message: "User successfully created!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(200, "User successfully created!", w)
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Error in creating user!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Error in creating user!", w)
 	}
 }
 
@@ -102,11 +80,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -117,38 +91,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		models.CheckErr(err)
 		return
 	}
-
-	// query := database.InitalizeDatabase().QueryRow("select password from user where rollno=$1", user.Rollno)
-	// fmt.Println(query)
-
-	// hashPassword := hashAndSalt([]byte(user.Password))
-
-	// err = query.Scan(&hashPassword)
-	// fmt.Println(err == sql.ErrNoRows)
-
-	// if err != nil {
-	// 	if err == sql.ErrNoRows {
-			// w.WriteHeader(http.StatusUnauthorized)
-			// response := Response {
-			// 	Message: "No such user present!",
-			// } 
-			// json.NewEncoder(w).Encode(response) 
-			// return
-	// 	}
-	// 	// If the error is of any other type, send a 500 status
-		// w.WriteHeader(http.StatusInternalServerError)
-		// response := Response {
-		// 	Message: "Passwords don't match!",
-	    // } 
-		// json.NewEncoder(w).Encode(response) 
-	// 	return
-	// } else {
-	// 	pwd_matches := comparePasswords(password, []byte(user.Password))
-	// 	response := Response {
-	// 		Message: "Logged In Successfully!",
-	//     } 
-	// 	json.NewEncoder(w).Encode(response) 
-	// }
 
 	rows, _ := database.InitalizeDatabase().Query("SELECT id, username, name, rollno, password FROM user")
 
@@ -174,28 +116,16 @@ func Login(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				response := models.Response {
-					Message: "Logged In Successfully!",
-				} 
-				json.NewEncoder(w).Encode(response) 
-
+				models.SendResponse(200, "Logged In Successfully!", w)
 				return
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Passwords don't match!",
-				} 
-				json.NewEncoder(w).Encode(response) 
+				models.SendResponse(400, "Passwords don't match!", w)
 				return
 			}
 		}
 	}
 
-	w.WriteHeader(http.StatusUnauthorized)
-	response := models.Response {
-		Message: "No such user present!",
-	} 
-	json.NewEncoder(w).Encode(response) 
+	models.SendResponse(404, "No such user present!", w)
 }
 
 func IsAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handler {
@@ -254,7 +184,7 @@ func IsAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handle
 				endpoint(w, r)
 			}
 		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			response := models.Response {
 				Message: "No Authorization Token provided!",
 			} 
@@ -285,11 +215,7 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -305,12 +231,7 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 			userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
 			
 			if userId == 0 {
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "No such user present!",
-				} 
-				json.NewEncoder(w).Encode(response) 
-		
+				models.SendResponse(404, "No such user present!", w)		
 				return
 			}
 
@@ -323,30 +244,15 @@ func GiveCoins(w http.ResponseWriter, r *http.Request) {
 			status3 := models.AddTransaction(database.InitalizeTransactionHistoryDatabase(), "add", user.Rollno, int(claims["rollno"].(float64)), user.Coins, time.Now().String())
 		
 			if status && status2 && status3 {
-				response := models.Response {
-					Message: "Coins given Successfully!",
-				} 
-				json.NewEncoder(w).Encode(response) 
+				models.SendResponse(200, "Coins given Successfully!", w)
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Error in giving coins, please try again!",
-				} 
-				json.NewEncoder(w).Encode(response) 
+				models.SendResponse(500, "Error in giving coins, please try again!", w)
 			}
 		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			response := models.Response {
-				Message: "You are not authorized to give Coins!",
-			} 
-			json.NewEncoder(w).Encode(response) 
+			models.SendResponse(401, "You are not authorized to give Coins!", w)
 		}
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please re-login and try again!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Please re-login and try again!", w)
 	}
 }	
 
@@ -368,11 +274,7 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal([]byte(string(body)), &user)
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -380,20 +282,11 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 
 	if status1 {
 		if int(claims["rollno"].(float64)) != user.SenderRollno {
-			w.WriteHeader(http.StatusUnauthorized)
-			response := models.Response {
-				Message: "Please login from your own account!",
-			} 
-			json.NewEncoder(w).Encode(response) 
-
+			models.SendResponse(401, "Please login from your own account!", w)
 			return
 		}
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please try again!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Please try again!", w)
 		return
 	}
 
@@ -401,34 +294,19 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 	receiverUser := models.GetUserId(database.InitalizeDatabase(), user.ReceiverRollno)
 
 	if senderUser == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "No such sending user present!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(404, "No such sending user present!", w)
 		return
 	}
 
 	if receiverUser == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "No such receiving user present!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(404, "No such receiving user present!", w)
 		return
 	}
 
 	numCompetiton := models.GetNumCompetiton(database.InitalizeDatabase(), user.ReceiverRollno)	
 
 	if numCompetiton == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "User not eligible for getting coins!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(406, "User not eligible for getting coins!", w)
 		return
 	}
 
@@ -451,48 +329,24 @@ func TransferCoins(w http.ResponseWriter, r *http.Request) {
 		if status1 && status2 {
 			models.AddTransaction(database.InitalizeTransactionHistoryDatabase(), "transfer", user.ReceiverRollno, user.SenderRollno, user.Coins, time.Now().String())
 				
-			response := models.Response {
-				Message: "Coins Transferred Successfully!",
-			} 
-			json.NewEncoder(w).Encode(response) 
-	
+			models.SendResponse(200, "Coins Transferred Successfully!", w)	
 			return
 		} else {
 			if status1 && !status2 {
 				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, senderCoins+user.Coins)
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Error in transferring coins, please try again!",
-				} 
-				json.NewEncoder(w).Encode(response) 
-		
+				models.SendResponse(500, "Error in transferring coins, please try again!", w)		
 				return
 			} else if !status1 && status2 {
 				models.UpdateUser(database.InitalizeDatabase(), senderUser, user.SenderRollno, receiverCoins-int(coins))
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Error in transferring coins, please try again!",
-				} 
-				json.NewEncoder(w).Encode(response) 
-		
+				models.SendResponse(500, "Error in transferring coins, please try again!", w)
 				return
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Error in transferring coins, please try again!",
-				} 
-				json.NewEncoder(w).Encode(response) 
-		
+				models.SendResponse(500, "Error in transferring coins, please try again!", w)
 				return
 			}
 		}
 	} else {
-		w.WriteHeader(http.StatusUnauthorized)
-		response := models.Response {
-			Message: "Insufficient Balance, to transfer!",
-		} 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(409, "Insufficient Balance, to transfer!", w)
 		return
 	}
 }
@@ -512,11 +366,7 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -526,12 +376,7 @@ func Balance(w http.ResponseWriter, r *http.Request) {
 	userId := models.GetUserId(database.InitalizeDatabase(), user.Rollno)
 
 	if userId == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "No such user present!",
-	    } 
-		json.NewEncoder(w).Encode(response) 
-
+		models.SendResponse(404, "No such user present!", w)
 		return
 	}
 
@@ -550,11 +395,7 @@ func Redeem(w http.ResponseWriter, r *http.Request){
 	}
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -570,20 +411,11 @@ func Redeem(w http.ResponseWriter, r *http.Request){
 
 	if status1 {
 		if int(claims["rollno"].(float64)) != redeem.Rollno {
-			w.WriteHeader(http.StatusUnauthorized)
-			response := models.Response {
-				Message: "Please login from your own account!",
-			} 
-			json.NewEncoder(w).Encode(response) 
-
+			models.SendResponse(401, "Please login from your own account!", w)
 			return
 		}
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please try again!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Please try again!", w)
 		return
 	}
 
@@ -593,38 +425,21 @@ func Redeem(w http.ResponseWriter, r *http.Request){
 		currentBalance := models.GetCoins(database.InitalizeDatabase(), redeem.Rollno)
 
 		if currentBalance < redeem.Coins {
-			w.WriteHeader(http.StatusInternalServerError)
-			response := models.Response {
-				Message: "Insufficient Balance!",
-			} 
-			json.NewEncoder(w).Encode(response) 
-
+			models.SendResponse(409, "Insufficient Balance, to redeem!", w)
 			return
 		} else {
 			status := models.AddRedeemRequest(database.InitalizeDatabase(), redeem.ItemName, redeem.Rollno, redeem.Coins)
 
 			if status {
-				response := models.Response {
-					Message: "Request Initiated!",
-				} 
-				json.NewEncoder(w).Encode(response) 
+				models.SendResponse(200, "Request Initiated!", w)
 				return
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				response := models.Response {
-					Message: "Error in creating request, please try again!",
-				} 
-				json.NewEncoder(w).Encode(response) 
+				models.SendResponse(500, "Error in creating request, please try again!", w)
 				return
 			}
 		}		
 	} else {
-		w.WriteHeader(http.StatusUnauthorized)
-		response := models.Response {
-			Message: "Admins' are not allowed to redeem coins!",
-		} 
-
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(406, "User is not eligible for redeeming!", w)
 		return
 	} 
 }
@@ -644,11 +459,7 @@ func ApproveRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !models.IsJSON(string(body)) {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Invalid Json!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(400, "Invalid JSON!", w)
 		return
 	}
 
@@ -669,11 +480,7 @@ func ApproveRequest(w http.ResponseWriter, r *http.Request) {
 
 			if err1 == nil && err2 == nil && err3 == nil {
 				if status1 != 1 {
-					w.WriteHeader(http.StatusInternalServerError)
-					response := models.Response {
-						Message: "Request already responded!",
-					} 
-					json.NewEncoder(w).Encode(response) 
+					models.SendResponse(403, "Request already responded!", w)
 					return
 				}
 
@@ -682,17 +489,10 @@ func ApproveRequest(w http.ResponseWriter, r *http.Request) {
 					status := models.UpdateRequestStatus(database.InitalizeDatabase(), req.Id, 2)
 
 					if status {
-						response := models.Response {
-							Message: "Request rejected, because of insufficient balance!",
-						} 
-						json.NewEncoder(w).Encode(response) 
+						models.SendResponse(200, "Request rejected, because of insufficient balance!", w)
 						return
 					} else {
-						w.WriteHeader(http.StatusInternalServerError)
-						response := models.Response {
-							Message: "Please try again!",
-						} 
-						json.NewEncoder(w).Encode(response) 
+						models.SendResponse(500, "Error in rejecting request, please try again!", w)
 						return
 					}
 				} else {
@@ -701,45 +501,26 @@ func ApproveRequest(w http.ResponseWriter, r *http.Request) {
 					if status {
 						status = models.UpdateRequestStatus(database.InitalizeDatabase(), req.Id, 0)
 						if status {
-							response := models.Response {
-								Message: "Request approved successfully!",
-							} 
-							json.NewEncoder(w).Encode(response) 
+							models.SendResponse(200, "Request accepted!", w)
 							return
 						} else {
 							_ = models.UpdateUser(database.InitalizeDatabase(), userId, rollno1, coins+coins1)
 
-							w.WriteHeader(http.StatusInternalServerError)
-							response := models.Response {
-								Message: "Please try again!",
-							} 
-							json.NewEncoder(w).Encode(response) 
+							models.SendResponse(500, "Error in accepting request, please try again!", w)
 							return
 						}
 					} else {
-						w.WriteHeader(http.StatusInternalServerError)
-						response := models.Response {
-							Message: "Please try again!",
-						} 
-						json.NewEncoder(w).Encode(response) 
+						models.SendResponse(500, "Error in accepting request, please try again!", w)
 						return
 					}
 				}
 			}
 		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			response := models.Response {
-				Message: "You are not authorized to give Coins!",
-			} 
-			json.NewEncoder(w).Encode(response) 
+			models.SendResponse(401, "You are not authorized to give Coins!", w)
 			return
 		}
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please re-login and try again!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Please try again!", w)
 		return
 	}
 }
@@ -774,19 +555,11 @@ func ShowUnapprovedRequest(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			response := models.Response {
-				Message: "You are not authorized to see pending requests!",
-			} 
-			json.NewEncoder(w).Encode(response) 
+			models.SendResponse(401, "You are not authorized to view unapproved requests!", w) 
 			return
 		}
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := models.Response {
-			Message: "Please re-login and try again!",
-		} 
-		json.NewEncoder(w).Encode(response) 
+		models.SendResponse(500, "Please try again!", w)
 		return
 	}
 }

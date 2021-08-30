@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 
 	gomail "gopkg.in/mail.v2"
@@ -276,4 +277,30 @@ func SendOtp(rollno int) bool {
 	}
 
 	return true
+}
+
+func SendResponse(status int, message string, w http.ResponseWriter) {
+	if status == 400 {
+		w.WriteHeader(http.StatusBadRequest)
+	} else if status == 401 {
+		w.WriteHeader(http.StatusUnauthorized)
+	} else if status == 403 {
+		w.WriteHeader(http.StatusForbidden)
+	} else if status == 404 {
+		w.WriteHeader(http.StatusNotFound)
+	} else if status == 409 {
+		w.WriteHeader(http.StatusConflict)
+	} else if status == 500 {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if status == 200 {
+		w.WriteHeader(http.StatusOK)
+	} else if status == 406 {
+		w.WriteHeader(http.StatusNotAcceptable)
+	}
+
+	response := Response {
+		Message: message,
+	}
+
+	json.NewEncoder(w).Encode(response) 
 }
