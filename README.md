@@ -6,6 +6,7 @@ This repository contains the code for the IITKCoin, a vision of a pseudo-currenc
 
 ### Relevant Links
 
+-   [Final Submission Folder](https://drive.google.com/drive/folders/1N93J_1ouR1AXctIZZkek0YMD5_LY0LVM)
 -   [Midterm Evaluation presentation](https://docs.google.com/presentation/d/1kriN-7A3v1RlXUDL5NETX3roJKRMJInptkWofIxY8dg/edit?usp=sharing)
 -   [Midterm Documentation](https://docs.google.com/document/d/1bvOWH4k0U-l2pQ1jLWIDzOkJ2wbHNW4jJw7tMWkUV6o/edit?usp=sharing)
 
