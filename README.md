@@ -58,7 +58,7 @@ This repository contains the code for the IITKCoin, a vision of a pseudo-currenc
 
 ```bash
 cd $GOPATH/src/github.com/<username>
-git clone https://github.com/gurbaaz27/iitk-coin.git
+git clone https://github.com/sparshs413/iitk-coin.git
 cd repo
 go run main.go
 #, or build the program and run the executable
